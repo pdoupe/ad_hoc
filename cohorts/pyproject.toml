@@ -22,10 +22,17 @@ dependencies = [
     "statsmodels (>=0.14.4,<0.15.0)",
     "pyfixest (>=0.29.0,<0.30.0)",
     "altair (>=5.5.0,<6.0.0)",
-    "pytest (>=8.4.1,<9.0.0)"
+    "pytest (>=8.4.1,<9.0.0)",
+    "coverage (>=7.9.2,<8.0.0)",
+    "pytest-cov (>=6.2.1,<7.0.0)"
 ]
 
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.4.1"
+pytest-cov = "^6.2.1"
+

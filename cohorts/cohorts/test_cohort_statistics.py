@@ -17,10 +17,8 @@ from .cohort_statistics import (
     compare_outlier_methods,
     calculate_anova_components,
     get_f_stat_components,
-    # process_dataframes_for_outliers,
     process_dataframes_with_gmv,
-    get_top_cohort_items,
-    # pretty_print_output
+    get_top_cohort_items
 )
 
 ### Test get_groups ###
@@ -72,7 +70,7 @@ def test_find_outliers_mean_multiple_basic():
     outliers = find_outliers_mean_multiple(data, multiplier=5)
     np.testing.assert_array_equal(outliers, np.array([False, False, False, False, False]))
 
-def test_find_outliers_mean_multiple_basic():
+def test_find_outliers_mean_multiple_basic_two():
     data = pd.Series([1, 1, 2, 3, 4, 150]) # Mean is 134. Some are less than 5*mean
     outliers = find_outliers_mean_multiple(data, multiplier=5)
     np.testing.assert_array_equal(outliers, np.array([False, False, False, False, False, True]))
@@ -81,7 +79,6 @@ def test_find_outliers_mean_multiple_zero_mean():
     data = pd.Series([0, 0, 0, 0, 0])
     outliers = find_outliers_mean_multiple(data, multiplier=5)
     np.testing.assert_array_equal(outliers, np.array([False, False, False, False, False]))
-
 
 def test_compare_outlier_methods_small_cohorts_skipped():
     df = pd.DataFrame({

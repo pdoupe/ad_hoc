@@ -9,14 +9,13 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plt
-from numpy import ndarray 
-from pandas import DataFrame
+from pandas import DataFrame, Series
 from scipy.stats import f_oneway, kruskal
 
 
 def get_groups(df: DataFrame, 
                performance_col: str, 
-               cohort_col: str) -> List[ndarray]:
+               cohort_col: str) -> List[np.ndarray]:
     """
       group data by cohorts for use in downstream functions
     """
@@ -26,7 +25,7 @@ def get_groups(df: DataFrame,
     return cohort_groups
 
 ## IQR method
-def find_outliers_iqr(data: ndarray, multiplier: int =3) -> ndarray[bool]:
+def find_outliers_iqr(data: np.ndarray, multiplier: int =3) -> Series:
     """
     Standard: outliers beyond Q1 - 1.5*IQR or Q3 + 1.5*IQR
     Conservative: multiplier = 1.5
@@ -43,7 +42,7 @@ def find_outliers_iqr(data: ndarray, multiplier: int =3) -> ndarray[bool]:
     return outliers
 
 
-def find_outliers_mean_multiple(data: ndarray, multiplier: int=5) -> ndarray[bool]:
+def find_outliers_mean_multiple(data: np.ndarray, multiplier: int=5) -> Series:
     """
     Flag values that are X times larger than the mean
     multiplier=5 means values > 5 * mean are outliers
@@ -259,33 +258,30 @@ def process_dataframes_for_outliers(
         print(f"Processing DataFrame: {df_name}...")
 
         # Perform outlier comparison
-        # NOTE: Assuming compare_outlier_methods returns an object/structure
-        # that allows attribute access or dictionary-like access as shown.
-        # If it returns a DataFrame, you might need to adjust accessors.
         outlier_comparison = compare_outlier_methods(df_tmp, value_column, group_column)
-
         # Get F-statistic components
         f_stat_components = get_f_stat_components(df_tmp, value_column, group_column)
 
-        # Calculate Kruskal-Wallis statistics
-        # The function signature for calculate_kruskal_wallis (KW_H, p_value, epsilon_squared, f_stat_from_kruskal)
-        # seems to return 4 values, so capture them accordingly.
-        # Changed f_stat to f_stat_kruskal to avoid confusion with f_stat_scipy/manual
         cohort_groups = get_groups(df_tmp, value_column, group_column)
-        kw_h_stat, kw_p_value = kruskal(*cohort_groups)
-        kw_eps_sq = kw_h_stat / (df_tmp.shape[0] + 1)
+        if len(cohort_groups) < 2:
+            kw_h_stat, kw_p_value, kw_eps_sq = np.nan, np.nan, np.nan
+        else:
+            kw_h_stat, kw_p_value = kruskal(*cohort_groups)
+            kw_eps_sq = kw_h_stat / (df_tmp.shape[0] + 1)
 
         # Calculate summary statistics based on outlier comparison results
-        # Using .any() on boolean series to check if any outlier exists in a cohort for 'share' calculation
-        # This assumes outlier_comparison.iqr_outliers/mean_5x_outliers are Series of counts, or 1s/0s per cohort.
-        # If they are counts per cohort, then `min(1, x)` is correct to convert >0 to 1 for share.
-        share_cohorts_with_outlier_IQR = (outlier_comparison.iqr_outliers > 0).mean() if not outlier_comparison.iqr_outliers.empty else 0.0
-        share_cohorts_with_outlier_5x = (outlier_comparison.mean_5x_outliers > 0).mean() if not outlier_comparison.mean_5x_outliers.empty else 0.0
-
-        # Sum total outliers across all cohorts
-        iqr_total_outliers = outlier_comparison['iqr_outliers'].sum()
-        mean_5x_total_outliers = outlier_comparison['mean_5x_outliers'].sum()
-        overlap_total_vendors = outlier_comparison['overlap_iqr_mean'].sum()
+        if not outlier_comparison.empty:
+            share_cohorts_with_outlier_IQR = (outlier_comparison['iqr_outliers'] > 0).mean()
+            share_cohorts_with_outlier_5x = (outlier_comparison['mean_5x_outliers'] > 0).mean()
+            iqr_total_outliers = outlier_comparison['iqr_outliers'].sum()
+            mean_5x_total_outliers = outlier_comparison['mean_5x_outliers'].sum()
+            overlap_total_vendors = outlier_comparison['overlap_iqr_mean'].sum()
+        else:
+            share_cohorts_with_outlier_IQR = 0.0
+            share_cohorts_with_outlier_5x = 0.0
+            iqr_total_outliers = 0
+            mean_5x_total_outliers = 0
+            overlap_total_vendors = 0
 
         # Compile results for the current DataFrame
         current_df_results = {
