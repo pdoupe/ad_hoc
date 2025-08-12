@@ -8,6 +8,8 @@ import numpy as np
 import pandas as pd
 from scipy.stats import f_oneway
 from pandas import DataFrame
+import pandas_gbq
+
 
 # Import all functions from your cohort_statistics.py file
 from .cohort_statistics import (
@@ -17,9 +19,12 @@ from .cohort_statistics import (
     compare_outlier_methods,
     calculate_anova_components,
     get_f_stat_components,
-    process_dataframes_with_gmv,
-    get_top_cohort_items
+    process_dataframes,
+    get_top_cohort_items,
+    load_dataframes_by_type
 )
+from .config_manager import TableConfig
+
 
 ### Test get_groups ###
 def test_get_groups_basic():
@@ -140,7 +145,7 @@ def test_get_f_stat_components_less_than_two_cohorts():
     assert np.isnan(results['ms_w_manual'])
 
 
-def test_process_dataframes_with_gmv_basic():
+def test_process_dataframes_basic():
     original_df = pd.DataFrame({
         'entity_id': [1, 2, 3],
         'vendor_code': ['A', 'B', 'C'],
@@ -164,7 +169,7 @@ def test_process_dataframes_with_gmv_basic():
         'test_df_2': df_to_process_2
     }
 
-    processed_dfs = process_dataframes_with_gmv(original_df, dataframes_dict)
+    processed_dfs = process_dataframes(original_df, dataframes_dict)
 
     assert isinstance(processed_dfs, dict)
     assert 'current' in processed_dfs
@@ -188,7 +193,7 @@ def test_process_dataframes_with_gmv_basic():
     assert df2_processed['_merge'].iloc[0] == 'both'
     assert df2_processed['_merge'].iloc[1] == 'left_only'
 
-def test_process_dataframes_with_gmv_gmv_contains_non_numeric():
+def test_process_dataframes_gmv_contains_non_numeric():
     original_df = pd.DataFrame({
         'entity_id': [1, 2],
         'vendor_code': ['A', 'B'],
@@ -202,7 +207,7 @@ def test_process_dataframes_with_gmv_gmv_contains_non_numeric():
         'some_data': [10, 20]
     })
 
-    processed_dfs = process_dataframes_with_gmv(original_df, {'test_df_1': df_to_process_1})
+    processed_dfs = process_dataframes(original_df, {'test_df_1': df_to_process_1})
     df1_processed = processed_dfs['test_df_1']
 
     assert df1_processed['gmv'].iloc[0] == pytest.approx(100.0)
@@ -271,3 +276,155 @@ def test_get_top_cohort_items_less_than_n():
     assert len(top_items_list) == 1
     assert top_items_list[0][1] == 2
 
+## test data loading
+
+@pytest.fixture
+def mock_table_config():
+    """
+    Provides a TableConfig instance with simplified, controlled data for testing.
+    This mock config allows us to predict what paths should be generated.
+    """
+    config_instance = TableConfig()
+    # We directly set the _config attribute to control its behavior precisely for tests.
+    # This bypasses the actual __post_init__ which loads the large default config.
+    object.__setattr__(config_instance, '_config', {
+        "Test Cat A": {
+            "even": {
+                "test_type_X": {
+                    "current": "bq_path_A_even_X_current",
+                    "original": "bq_path_A_even_X_original"
+                },
+                "test_type_Y": {
+                    "current": "bq_path_A_even_Y_current"
+                }
+            },
+            "uneven": {
+                "test_type_X": {
+                    "current": "bq_path_A_uneven_X_current"
+                }
+            }
+        },
+        "Test Cat B": {
+            "even": {
+                "test_type_Z": {
+                    "current": "bq_path_B_even_Z_current"
+                }
+            }
+        }
+    })
+    return config_instance
+
+@pytest.fixture
+def mock_base_sql_query_template():
+    """Provides a generic base SQL query template for testing."""
+    return "SELECT * FROM `{table_path}` LIMIT 1"
+
+@pytest.fixture
+def mock_project_id():
+    """Provides a dummy project ID for testing."""
+    return "mock-gcp-project"
+
+# --- Test Cases for load_dataframes_by_type ---
+
+def test_load_dataframes_successful_loading(mocker, mock_table_config: TableConfig, mock_base_sql_query_template: Literal['SELECT * FROM `{table_path}` LIMIT 1'], mock_project_id: Literal['mock-gcp-project']):
+    """
+    Tests successful loading of DataFrames for an existing data type.
+    Mocks pandas_gbq.read_gbq to return consistent dummy DataFrames.
+    """
+    # Create a simple DataFrame that pandas_gbq.read_gbq will return
+    mock_df_content = pd.DataFrame({'mock_col': [1, 2], 'data': ['A', 'B']})
+    mocker.patch('pandas_gbq.read_gbq', return_value=mock_df_content)
+
+    specific_data_type = "test_type_X" # This type has 3 paths in our mock config
+    loaded_dfs = load_dataframes_by_type(specific_data_type, mock_base_sql_query_template, mock_table_config, mock_project_id)
+
+    # Define the expected keys based on our mock_table_config for "test_type_X"
+    expected_keys = {
+        "Test Cat A-even-test_type_X-current",
+        "Test Cat A-even-test_type_X-original",
+        "Test Cat A-uneven-test_type_X-current"
+    }
+
+    # Assertions
+    assert isinstance(loaded_dfs, dict)
+    assert len(loaded_dfs) == 3 # We expect 3 DataFrames to be loaded for "test_type_X"
+    assert set(loaded_dfs.keys()) == expected_keys # Check if all expected keys are present
+
+    # Verify each value is a DataFrame and has the expected content
+    for key, df in loaded_dfs.items():
+        assert isinstance(df, pd.DataFrame)
+        pd.testing.assert_frame_equal(df, mock_df_content) # Ensure the content is exactly our mock_df
+
+    # Verify pandas_gbq.read_gbq was called the correct number of times
+    assert pandas_gbq.read_gbq.call_count == 3
+
+    # Verify specific calls (optional, but good for detailed checks)
+    pandas_gbq.read_gbq.assert_any_call(
+        mock_base_sql_query_template.format(table_path="bq_path_A_even_X_current"),
+        project_id=mock_project_id
+    )
+    pandas_gbq.read_gbq.assert_any_call(
+        mock_base_sql_query_template.format(table_path="bq_path_A_even_X_original"),
+        project_id=mock_project_id
+    )
+    pandas_gbq.read_gbq.assert_any_call(
+        mock_base_sql_query_template.format(table_path="bq_path_A_uneven_X_current"),
+        project_id=mock_project_id
+    )
+
+
+def test_load_dataframes_non_existent_data_type(mocker, mock_table_config: TableConfig, mock_base_sql_query_template: Literal['SELECT * FROM `{table_path}` LIMIT 1'], mock_project_id: Literal['mock-gcp-project']):
+    """
+    Tests that an empty dictionary is returned when specific_data_type is not found in the config.
+    """
+    mocker.patch('pandas_gbq.read_gbq', return_value=pd.DataFrame()) # Mock it just in case
+
+    specific_data_type = "non_existent_data_type"
+    loaded_dfs = load_dataframes_by_type(specific_data_type, mock_base_sql_query_template, mock_table_config, mock_project_id)
+
+    assert isinstance(loaded_dfs, dict)
+    assert len(loaded_dfs) == 0 # Should return an empty dictionary
+    pandas_gbq.read_gbq.assert_not_called() # pandas_gbq.read_gbq should not have been called at all
+
+
+def test_load_dataframes_handles_pandas_gbq_exception(mocker, mock_table_config: TableConfig, mock_base_sql_query_template: Literal['SELECT * FROM `{table_path}` LIMIT 1'], mock_project_id: Literal['mock-gcp-project'], capsys: CaptureFixture[str]):
+    """
+    Tests that the function handles exceptions raised by pandas_gbq.read_gbq gracefully.
+    It should return successfully loaded DFs and print error messages for failures.
+    """
+    # Create a mock DataFrame for successful loads
+    mock_df_ok = pd.DataFrame({'ok_col': [1]})
+    mock_exception = Exception("Simulated BigQuery connection error")
+
+    # Use side_effect to define different behaviors for consecutive calls to read_gbq
+    # Based on the iteration order of our mock_table_config for "test_type_X":
+    # 1st call: Test Cat A-even-test_type_X-current -> should raise exception
+    # 2nd call: Test Cat A-even-test_type_X-original -> should succeed
+    # 3rd call: Test Cat A-uneven-test_type_X-current -> should succeed
+    mocker.patch('pandas_gbq.read_gbq', side_effect=[
+        mock_exception, # First call will fail
+        mock_df_ok,     # Second call will succeed
+        mock_df_ok      # Third call will succeed
+    ])
+
+    specific_data_type = "test_type_X" # This type has 3 paths in mock config
+    loaded_dfs = load_dataframes_by_type(specific_data_type, mock_base_sql_query_template, mock_table_config, mock_project_id)
+
+    # Assertions
+    assert isinstance(loaded_dfs, dict)
+    assert len(loaded_dfs) == 2 # One path should have failed, two should have succeeded
+
+    # Verify that the keys corresponding to successful loads are present
+    assert "Test Cat A-even-test_type_X-original" in loaded_dfs.keys()
+    assert "Test Cat A-uneven-test_type_X-current" in loaded_dfs.keys()
+    # Verify that the key for the failed load is NOT present
+    assert "Test Cat A-even-test_type_X-current" not in loaded_dfs.keys()
+
+    # Verify pandas_gbq.read_gbq was called the expected number of times
+    assert pandas_gbq.read_gbq.call_count == 3
+
+    # Capture stdout/stderr to check if error messages were printed
+    captured = capsys.readouterr()
+    assert "Failed to load" in captured.out
+    assert "Simulated BigQuery connection error" in captured.out
+    assert "Test Cat A-even-test_type_X-current" in captured.out # Error message should mention the failed key
