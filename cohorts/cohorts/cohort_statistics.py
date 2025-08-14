@@ -4,6 +4,8 @@ import json
 import warnings
 from collections.abc import ItemsView
 from typing import Dict, List, Optional, Tuple, Union
+from .config_manager import TableConfig
+import pandas_gbq
 
 import numpy as np
 import pandas as pd
@@ -307,9 +309,11 @@ def process_dataframes_for_outliers(
     return results_df
 
 
-def process_dataframes_with_gmv(
+def process_dataframes(
     original_df: DataFrame,
-    dataframes_to_process: Dict[str, DataFrame]
+    dataframes_to_process: Dict[str, DataFrame],
+    value_column: str = 'gmv',
+    coerce_nan: bool = True
 ) -> Dict[str, DataFrame]:
     """
     Merges GMV data into a dictionary of DataFrames and cleans the 'gmv' column.
@@ -326,6 +330,9 @@ def process_dataframes_with_gmv(
                                                      desired names (strings) and
                                                      values are the DataFrames to be
                                                      merged with GMV data.
+        value_column (str, optional): The name of the column containing GMV data.
+                                      Defaults to 'gmv'.
+        coerce_nan (bool, optional): Whether to fill nans with 0. Default True
 
     Returns:
         Dict[str, DataFrame]: A new dictionary where keys are the names and
@@ -333,36 +340,57 @@ def process_dataframes_with_gmv(
                               the 'current' DataFrame and all merged DataFrames
                               with cleaned 'gmv' data.
     """
-    # Prepare the GMV lookup DataFrame once
-    gmv_lookup = original_df[['entity_id', 'vendor_code', 'gmv']].copy()
-    
-    processed_dataframes = {'current': original_df} # Start with the 'current' df
+    try:
+        original_df.rename(columns={'global_entity_id': 'entity_id'}, inplace=True)
+    except KeyError:
+        pass
 
-    print(f"Starting GMV processing for {len(dataframes_to_process)} dataframes...")
+    try:
+        original_df.rename(columns={'vendor_id': 'vendor_code'}, inplace=True)
+    except KeyError:
+        pass
+    
+    # Prepare the GMV lookup DataFrame once
+    v_lookup = original_df[['entity_id', 'vendor_code']].copy()
+    
+    processed_dataframes = {'original': original_df} # Start with the 'current' df
+
+    print(f"Starting processing for {len(dataframes_to_process)} dataframes...")
 
     for name, df_to_merge in dataframes_to_process.items():
         # Perform a left merge to bring 'gmv' data into df_to_merge
         # 'how='left'' ensures all rows from df_to_merge are kept.
+        try:
+            df_to_merge.rename(columns={'global_entity_id': 'entity_id'}, inplace=True)
+        except KeyError:
+            pass
+
+        try:
+            df_to_merge.rename(columns={'vendor_id': 'vendor_code'}, inplace=True)
+        except KeyError:
+            pass
+
         merged_df = pd.merge(
             df_to_merge,
-            gmv_lookup,
+            v_lookup,
             on=['entity_id', 'vendor_code'],
             how='left',
             indicator=True
         )
 
-        # Convert 'gmv' column to numeric, coercing errors to NaN
-        merged_df['gmv'] = pd.to_numeric(merged_df['gmv'], errors='coerce')
-        # Fill any resulting NaN values in 'gmv' with 0.
-        merged_df.fillna({'gmv': 0}, inplace=True) 
+        if coerce_nan == True:
+            # Convert value column to numeric, coercing errors to NaN
+            merged_df[value_column] = pd.to_numeric(merged_df[value_column], errors='coerce')
+            # Fill any resulting NaN values in value with 0.
+            merged_df.fillna({value_column: 0}, inplace=True) 
         processed_dataframes[name] = merged_df
 
         # "lost vendors" due to not being in gmv_lookup:
         # Create a temporary column to mark if gmv was filled by the merge
         num_unmatched_in_gmv_lookup = (merged_df['_merge'] == 'left_only').sum()
-        print(f"  {num_unmatched_in_gmv_lookup} vendors from '{name}' were not found in GMV source.")
+        print(f"  {num_unmatched_in_gmv_lookup} vendors from '{name}' were not found in value source.")
 
-    print("\nGMV processing complete.")
+    print("\nValue processing complete.")
     return processed_dataframes
 
 
@@ -448,3 +476,85 @@ def pretty_print_output(items: ItemsView) -> None:
     return
 
 
+def load_dataframes_by_type(
+    specific_data_type: str,
+    base_sql_query_template: str,
+    config: TableConfig,
+    project_id: str
+) -> Dict[str, pd.DataFrame]:
+    """
+    Loads DataFrames from BigQuery for a specified data type based on TableConfig.
+
+    This function iterates through the configured table paths for a given data type,
+    constructs the appropriate SQL query, and loads the data into pandas DataFrames.
+    The DataFrames are returned in a flattened dictionary for easy access.
+
+    Args:
+        specific_data_type (str): The exact data type string to filter by
+                                  (e.g., "cohort data", "recommendation (KPIs)").
+        base_sql_query_template (str): The base SQL query string with a '{table_path}' placeholder.
+                                       Example: "SELECT * FROM `your_project_id.your_dataset_id.{table_path}`"
+        config (TableConfig): An instance of the TableConfig class containing the
+                              BigQuery path configuration
+        project_id (str): Your Google Cloud Project ID. This is required by
+                          `pandas_gbq.read_gbq`..
+
+    Returns:
+        Dict[str, pd.DataFrame]: A flattened dictionary where keys are descriptive strings
+                                 (e.g., "Category-Parity-DataType-Version") and values are
+                                 the loaded pandas DataFrames.
+                                 Includes only DataFrames for the `specific_data_type`.
+    """
+    loaded_dataframes: Dict[str, pd.DataFrame] = {}
+    skipped_info: List[str] = [] # To keep track of any DataFrames that failed to load
+
+    print(f"Starting to load '{specific_data_type}' DataFrames...")
+    print("-" * 60)
+
+    for category in config.get_categories():
+        for parity in config.get_parities(category):
+            # Check if the desired specific_data_type exists for this category/parity
+            if specific_data_type in config.get_data_types(category, parity):
+                # Iterate through versions (e.g., 'current', 'original') for the specific_data_type
+                for version in config.get_versions(category, parity, specific_data_type):
+                    try:
+                        # Get the full BigQuery table path from TableConfig
+                        table_path = config.get_path(category, parity, specific_data_type, version)
+
+                        # Format the base SQL query with the specific table path
+                        full_sql_query = base_sql_query_template.format(table_path=table_path)
+
+                        # Construct the flattened key for the output dictionary
+                        df_key = f"{category}-{parity}-{specific_data_type}-{version}"
+
+                        print(f"Reading: Key='{df_key}'")
+                        print(f"  Table Path: {table_path}")
+
+                        # --- The actual pandas_gbq call ---
+                        # Pass the project_id explicitly to read_gbq
+                        df = pandas_gbq.read_gbq(full_sql_query, project_id=project_id)
+                        # -----------------------------------
+
+                        # Store the loaded DataFrame in the dictionary
+                        loaded_dataframes[df_key] = df
+                        print(f"  Successfully loaded {len(df)} rows.")
+
+                    except KeyError as e:
+                        # Catch configuration errors (e.g., path not found in TableConfig)
+                        error_msg = f"Configuration error for {df_key if 'df_key' in locals() else 'N/A'}: {e}"
+                        skipped_info.append(error_msg)
+                        print(f"  [ERROR] {error_msg}")
+                    except Exception as e:
+                        # Catch any other loading errors (e.g., BigQuery connection, table not found in BQ)
+                        error_msg = f"Failed to read from {table_path} (Key: {df_key if 'df_key' in locals() else 'N/A'}): {e}"
+                        skipped_info.append(error_msg)
+                        print(f"  [ERROR] {error_msg}")
+                    finally:
+                        print("-" * 60) # Print separator line for readability
+
+    print(f"Finished loading '{specific_data_type}' DataFrames.")
+    print(f"Total '{specific_data_type}' DataFrames loaded: {len(loaded_dataframes)}")
+    if skipped_info:
+        print(f"Skipped {len(skipped_info)} DataFrames due to errors:\n- " + "\n- ".join(skipped_info))
+
+    return loaded_dataframes

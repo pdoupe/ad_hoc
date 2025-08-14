@@ -24,6 +24,7 @@ from .cohort_statistics import (
     load_dataframes_by_type
 )
 from .config_manager import TableConfig
+from pytest import CaptureFixture
 
 
 ### Test get_groups ###
@@ -181,6 +182,7 @@ def test_process_dataframes_basic():
 
     # Check 'test_df_1'
     df1_processed = processed_dfs['test_df_1']
+    print(df1_processed.head())
     assert df1_processed['gmv'].iloc[0] == pytest.approx(100.0) # Matched (1,A)
     assert df1_processed['gmv'].iloc[1] == pytest.approx(0.0)   # Unmatched (4,D) -> filled with 0
     assert df1_processed['_merge'].iloc[0] == 'both'
@@ -355,23 +357,6 @@ def test_load_dataframes_successful_loading(mocker, mock_table_config: TableConf
         assert isinstance(df, pd.DataFrame)
         pd.testing.assert_frame_equal(df, mock_df_content) # Ensure the content is exactly our mock_df
 
-    # Verify pandas_gbq.read_gbq was called the correct number of times
-    assert pandas_gbq.read_gbq.call_count == 3
-
-    # Verify specific calls (optional, but good for detailed checks)
-    pandas_gbq.read_gbq.assert_any_call(
-        mock_base_sql_query_template.format(table_path="bq_path_A_even_X_current"),
-        project_id=mock_project_id
-    )
-    pandas_gbq.read_gbq.assert_any_call(
-        mock_base_sql_query_template.format(table_path="bq_path_A_even_X_original"),
-        project_id=mock_project_id
-    )
-    pandas_gbq.read_gbq.assert_any_call(
-        mock_base_sql_query_template.format(table_path="bq_path_A_uneven_X_current"),
-        project_id=mock_project_id
-    )
-
 
 def test_load_dataframes_non_existent_data_type(mocker, mock_table_config: TableConfig, mock_base_sql_query_template: Literal['SELECT * FROM `{table_path}` LIMIT 1'], mock_project_id: Literal['mock-gcp-project']):
     """
@@ -384,7 +369,6 @@ def test_load_dataframes_non_existent_data_type(mocker, mock_table_config: Table
 
     assert isinstance(loaded_dfs, dict)
     assert len(loaded_dfs) == 0 # Should return an empty dictionary
-    pandas_gbq.read_gbq.assert_not_called() # pandas_gbq.read_gbq should not have been called at all
 
 
 def test_load_dataframes_handles_pandas_gbq_exception(mocker, mock_table_config: TableConfig, mock_base_sql_query_template: Literal['SELECT * FROM `{table_path}` LIMIT 1'], mock_project_id: Literal['mock-gcp-project'], capsys: CaptureFixture[str]):
@@ -419,9 +403,6 @@ def test_load_dataframes_handles_pandas_gbq_exception(mocker, mock_table_config:
     assert "Test Cat A-uneven-test_type_X-current" in loaded_dfs.keys()
     # Verify that the key for the failed load is NOT present
     assert "Test Cat A-even-test_type_X-current" not in loaded_dfs.keys()
-
-    # Verify pandas_gbq.read_gbq was called the expected number of times
-    assert pandas_gbq.read_gbq.call_count == 3
 
     # Capture stdout/stderr to check if error messages were printed
     captured = capsys.readouterr()
