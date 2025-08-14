@@ -29,3 +29,9 @@ graph TD
     end
 
     P --> Q[Recommended budget that maximises ROAS];
+
+    Q --> S[Recommended ROAS must be more than current ROAS];
+    Q --> T;
+    M --> T;
+    R[If active campaign] --> S;
+    R --> T[UTR must not drop significantly];
