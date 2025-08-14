@@ -1,0 +1,31 @@
+graph TD
+    %% CPC Budget Recommendation Process
+    subgraph Determine Base Budget
+        A[Start: Request] --> B{Booking last month?};
+        B -- Yes --> C[Use last month's budget];
+        B -- No --> D{Has GMV?};
+        D -- Yes --> E[Base budget = GMV x GMV factor];
+        D -- No --> F[Use avg budget of neighbors];
+        C --> G[Candidate Base Budget];
+        E --> G;
+        F --> G;
+    end
+
+    subgraph Apply Constraints
+        G --> H["Budget = max{10EUR, GMV x bid_floor, base budget}"];
+        G --> I["Budget = min{0.2*GMV, 0.6*GMV x bid_ceiling, max(budget_ROAS=3)}"];
+        H --> J[Final Base Budget];
+        I --> J;
+    end
+
+    J --> K[ROAS Estimation];
+
+    subgraph The ROAS Estimation Loop
+        K --> L["Iterate through budget multipliers (1.1x - 2.0x)"];
+        L --> M[Calculate Predicted Clicks with CEB];
+        M --> N[Calculate pred orders = pred clicks x CTO];
+        N --> O[Calculate pred value = pred orders x AOV];
+        O --> P[Calculate ROAS = pred value / budget];
+    end
+
+    P --> Q[Recommended budget that maximises ROAS];
