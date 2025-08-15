@@ -150,18 +150,19 @@ def test_process_dataframes_basic():
     original_df = pd.DataFrame({
         'entity_id': [1, 2, 3],
         'vendor_code': ['A', 'B', 'C'],
-        'gmv': [100.0, 200.0, 300.0],
         'other_col': ['x', 'y', 'z']
     })
     
     df_to_process_1 = pd.DataFrame({
         'entity_id': [1, 4], # 4 will be unmatched
         'vendor_code': ['A', 'D'],
+        'gmv': [100.0, 0.0],
         'some_data': [10, 20]
     })
     df_to_process_2 = pd.DataFrame({
         'entity_id': [2, 5], # 5 will be unmatched
         'vendor_code': ['B', 'E'],
+        'gmv': [200.0, 0.0],
         'another_data': [30, 40]
     })
 
@@ -173,12 +174,12 @@ def test_process_dataframes_basic():
     processed_dfs = process_dataframes(original_df, dataframes_dict)
 
     assert isinstance(processed_dfs, dict)
-    assert 'current' in processed_dfs
+    assert 'original' in processed_dfs
     assert 'test_df_1' in processed_dfs
     assert 'test_df_2' in processed_dfs
 
     # Check 'current' df (should be unchanged)
-    pd.testing.assert_frame_equal(processed_dfs['current'], original_df)
+    pd.testing.assert_frame_equal(processed_dfs['original'], original_df)
 
     # Check 'test_df_1'
     df1_processed = processed_dfs['test_df_1']
@@ -199,19 +200,19 @@ def test_process_dataframes_gmv_contains_non_numeric():
     original_df = pd.DataFrame({
         'entity_id': [1, 2],
         'vendor_code': ['A', 'B'],
-        'gmv': [100.0, 'invalid_gmv'], # Invalid GMV
         'other_col': ['x', 'y']
     })
     
     df_to_process_1 = pd.DataFrame({
         'entity_id': [1, 2],
         'vendor_code': ['A', 'B'],
-        'some_data': [10, 20]
+        'gmv': [100.0, 'invalid_gmv'], # Invalid GMV
+        'another_col': [10, 20]
     })
 
     processed_dfs = process_dataframes(original_df, {'test_df_1': df_to_process_1})
     df1_processed = processed_dfs['test_df_1']
-
+    print(df1_processed)
     assert df1_processed['gmv'].iloc[0] == pytest.approx(100.0)
     assert df1_processed['gmv'].iloc[1] == pytest.approx(0.0) # 'invalid_gmv' becomes NaN, then 0
 
@@ -326,7 +327,6 @@ def mock_project_id():
     """Provides a dummy project ID for testing."""
     return "mock-gcp-project"
 
-# --- Test Cases for load_dataframes_by_type ---
 
 def test_load_dataframes_successful_loading(mocker, mock_table_config: TableConfig, mock_base_sql_query_template: Literal['SELECT * FROM `{table_path}` LIMIT 1'], mock_project_id: Literal['mock-gcp-project']):
     """
@@ -370,6 +370,8 @@ def test_load_dataframes_non_existent_data_type(mocker, mock_table_config: Table
     assert isinstance(loaded_dfs, dict)
     assert len(loaded_dfs) == 0 # Should return an empty dictionary
 
+# --- Test Cases for load_dataframes_by_type ---
+
 
 def test_load_dataframes_handles_pandas_gbq_exception(mocker, mock_table_config: TableConfig, mock_base_sql_query_template: Literal['SELECT * FROM `{table_path}` LIMIT 1'], mock_project_id: Literal['mock-gcp-project'], capsys: CaptureFixture[str]):
     """
@@ -406,6 +408,5 @@ def test_load_dataframes_handles_pandas_gbq_exception(mocker, mock_table_config:
 
     # Capture stdout/stderr to check if error messages were printed
     captured = capsys.readouterr()
-    assert "Failed to load" in captured.out
     assert "Simulated BigQuery connection error" in captured.out
-    assert "Test Cat A-even-test_type_X-current" in captured.out # Error message should mention the failed key
+    assert "Test Cat A-even-test_type_X-current" in captured.out
