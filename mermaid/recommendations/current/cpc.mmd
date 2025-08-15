@@ -23,15 +23,12 @@ graph TD
     subgraph The ROAS Estimation Loop
         K --> L["Iterate through budget multipliers (1.1x - 2.0x)"];
         L --> M[Calculate Predicted Clicks with CEB];
-        M --> N[Calculate pred orders = pred clicks x CTO];
-        N --> O[Calculate pred value = pred orders x AOV];
+        M --> N[Calculate pred orders = pred clicks x last month's vendor CTO];
+        N --> O[Calculate pred value = pred orders x last month's vendor AOV];
         O --> P[Calculate ROAS = pred value / budget];
     end
 
     P --> Q[Recommended budget that maximises ROAS];
 
     Q --> S[Recommended ROAS must be more than current ROAS];
-    Q --> T;
-    M --> T;
-    R[If active campaign] --> S;
-    R --> T[UTR must not drop significantly];
+    B -- Yes --> S;
