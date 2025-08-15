@@ -1,0 +1,108 @@
+%% https://docs.google.com/document/d/1xgW9qAcw-VsgswQ-sOMvV6Ohtkf_cRwFlAISb39FEyQ/edit?tab=t.0
+
+ graph TB
+    Start([Campaign Recommendation Request]) --> TypeCheck{Campaign Type?}
+    
+    TypeCheck -->|Single Vendor| SV[Single Vendor Flow]
+    TypeCheck -->|Chain| CH[Chain Flow]
+    
+    %% Single Vendor Branch
+    SV --> SVDuration{Campaign Duration?}
+    SVDuration -->|Monthly| SVM[Monthly Campaign]
+    SVDuration -->|One-off| SVO[One-off Campaign<br/>scalingFactor = duration/30]
+    
+    %% Monthly Single Vendor
+    SVM --> SVMBudget[Calculate Budget Tiers]
+    SVMBudget --> RoundingCalc[["Calculate RoundingFactor<br/>minBudget < 100: 5<br/>100-999: 50<br/>≥1000: 100"]]
+    
+    RoundingCalc --> GMVCheck{GMV Available?}
+    GMVCheck -->|Yes| GMVCalc[["GMV-based Calculation<br/>Mid = gmv × gmvFactor<br/>High = Mid × 1.7<br/>Low = Mid × 0.8"]]
+    GMVCheck -->|No| FallbackCheck1[Fallback Conditions Check]
+    
+    GMVCalc --> ValidateGMV{Low ≥ minBudget?}
+    ValidateGMV -->|Yes| RoundBudget1[["Round all tiers up to RoundingFactor:<br/>Tier = ⌈Tier/RF⌉ × RF"]]
+    ValidateGMV -->|No| FallbackCheck1
+    
+    FallbackCheck1 --> FallbackCalc[["Fallback Calculation<br/>High = minBudget × 2.5<br/>Mid = High × 0.6<br/>Low = Mid × 0.8"]]
+    FallbackCalc --> RoundBudget1
+    
+    RoundBudget1 --> CheckDupes1{All tiers unique?}
+    CheckDupes1 -->|No| AdjustTiers1[["Add RoundingFactor to duplicates:<br/>If Low=Mid=High → Mid+=RF, High+=2×RF<br/>If Low=Mid → Mid+=RF<br/>If Mid=High → High+=RF"]]
+    CheckDupes1 -->|Yes| SVMBid
+    AdjustTiers1 --> SVMBid
+    
+    SVMBid[Calculate Bid] --> DSApi1{DS API Available?}
+    DSApi1 -->|Yes| DSBid[Get Bid from DS API]
+    DSApi1 -->|No| BidFallback[Bid = BidFloor × 1.15<br/>limit to 3 digits]
+    
+    DSBid --> SVMPerf
+    BidFallback --> SVMPerf
+    
+    SVMPerf[Performance Estimation] --> ClicksCalc[["Calculate Clicks<br/>From DS or budget/bid<br/>× 0.9, round to 25 multiple"]]
+    ClicksCalc --> CVRCalc[Get Vendor CVR]
+    CVRCalc --> OrdersCalc[Orders = Clicks × CVR]
+    OrdersCalc --> GrowthCalc{CVR Recent?}
+    GrowthCalc -->|Yes<br/>< 2 months| CalcGrowth[["Calculate Growth<br/>ClicksGrowth = Clicks/OrganicClicks<br/>OrdersGrowth = Orders/OrganicOrders"]]
+    GrowthCalc -->|No| SVMOutput
+    CalcGrowth --> SVMOutput([Monthly Single Vendor Output])
+    
+    %% One-off Single Vendor
+    SVO --> SVOBudget[Calculate Scaled Budget Tiers]
+    SVOBudget --> ScaledRounding[["Calculate RoundingFactor<br/>Using minBudget × scalingFactor"]]
+    ScaledRounding --> GMVCheck2{GMV Available?}
+    
+    GMVCheck2 -->|Yes| ScaledGMV[["Scaled GMV Calculation<br/>Mid = gmv × gmvFactor × scalingFactor<br/>High = Mid × 1.7<br/>Low = Mid × 0.8"]]
+    GMVCheck2 -->|No| ScaledFallback[["Scaled Fallback<br/>High = minBudget × scalingFactor × 2.5<br/>Mid = High × 0.6<br/>Low = Mid × 0.8"]]
+    
+    ScaledGMV --> RoundScaled[["Round Budget Tiers<br/>0→1, <10→integer<br/>≥10→RoundingFactor multiple"]]
+    ScaledFallback --> RoundScaled
+    
+    RoundScaled --> StretchCheck{low < mid < high?}
+    StretchCheck -->|No| StretchAdjust[["Budget Tier Adjustments<br/>(stretchFactor: ≤10→1, ≤25→5, ≤50→10, >50→25):<br/><br/>1) L≥M & H>M → M=L+stretch(L)<br/>2) L<M & H≤M → H=M+stretch(M)<br/>3) L≥M & H≤M & 1<M≤10 & M-1≥minBudget → L=M-1, H=M+1<br/>4) L≥M & H≤M & (0≤M≤1 or M-1<minBudget) → M=L+1, H=M+1<br/>5) L≥M & H≤M & 10<M≤50 → L=M-stretch(M), H=M+stretch(M)<br/>6) L≥M & H≤M & M>50 → M=L+RF, H=M+RF"]]
+    StretchCheck -->|Yes| SVOBid
+    StretchAdjust --> SVOBid
+
+    SVOBid[Calculate Bid<br/>budget ÷ scalingFactor] --> SVOPerf
+    SVO --> SVOBid 
+    SVOPerf[Performance Estimation] --> ScaledClicks[["Clicks × scalingFactor<br/>"]]
+    ScaledClicks --> ScaledOrders[["Orders × scalingFactor<br/>Round based on value"]]
+    ScaledOrders --> PerfStretch[Apply stretchFactor rules]
+    PerfStretch --> SVOOutput([One-off Single Vendor Output])
+    
+    %% Chain Branch
+    CH --> CHDuration{Campaign Duration?}
+    CHDuration -->|Monthly| CHM[Monthly Chain Campaign]
+    CHDuration -->|One-off| CHO[One-off Chain Campaign]
+    
+    %% Monthly Chain
+    CHM --> CHMBudget{Budget Set?}
+    CHMBudget -->|Yes| GMVDist[["Distribute by GMV<br/>budget_vendor = budget × gmv_vendor/total_gmv"]]
+    CHMBudget -->|No| CHMFallback[Use minBudget fallback per vendor, as in single vendor]
+    
+    GMVDist --> DSChain[DS API call per vendor]
+    CHMFallback --> DSChain
+    DSChain --> CHMBid[Calculate Bid per vendor]
+    CHMBid --> CHMPerf[Performance per vendor<br/>using vendor CVR]
+    CHMPerf --> CHMOutput([Monthly Chain Output<br/>Low tier per vendor])
+    
+    %% One-off Chain
+    CHO --> CHOScale[Apply scalingFactor]
+    CHOScale --> CHOBudget{Budget Set?}
+    CHOBudget -->|Yes| CHODist[Distribute budget ÷ scalingFactor by GMV]
+    CHOBudget -->|No| CHOVendor[Budget × scalingFactor per vendor]
+    
+    CHODist --> CHOCalc[Calculate per vendor]
+    CHOVendor --> CHOCalc
+    CHOCalc --> CHOPerf[Performance × scalingFactor<br/>Round values]
+    CHOPerf --> CHOOutput([One-off Chain Output])
+    
+    %% Styling - High contrast for dark backgrounds
+    classDef processNode fill:#2196F3,stroke:#FFFFFF,stroke-width:3px,color:#FFFFFF
+    classDef decisionNode fill:#FF9800,stroke:#FFFFFF,stroke-width:3px,color:#FFFFFF
+    classDef calcNode fill:#9C27B0,stroke:#FFFFFF,stroke-width:3px,color:#FFFFFF
+    classDef outputNode fill:#4CAF50,stroke:#FFFFFF,stroke-width:3px,color:#FFFFFF
+    
+    class SV,CH,SVM,SVO,CHM,CHO,SVMBudget,SVOBudget,SVMBid,SVOBid,CHMBid,SVMPerf,SVOPerf,CHMPerf,CHOCalc,CHOPerf processNode
+    class TypeCheck,SVDuration,CHDuration,GMVCheck,GMVCheck2,ValidateGMV,DSApi1,DSApi2,GrowthCalc,StretchCheck,PerfAdjustCheck,CHMBudget,CHOBudget,CheckDupes1 decisionNode
+    class RoundingCalc,GMVCalc,FallbackCalc,ScaledRounding,ScaledGMV,ScaledFallback,RoundScaled,StretchAdjust,ScaledClicks,ScaledOrders,PerfAdjust,GMVDist,CHODist,ClicksCalc,CVRCalc,OrdersCalc,CalcGrowth,DSBid,DSBid2,BidFallback,BidFallback2 calcNode
+    class SVMOutput,SVOOutput,CHMOutput,CHOOutput outputNode
