@@ -353,8 +353,7 @@ def process_dataframes(
     # Prepare the GMV lookup DataFrame once
     v_lookup = original_df[['entity_id', 'vendor_code']].copy()
     
-    processed_dataframes = {'original': original_df} # Start with the 'current' df
-
+    processed_dataframes = {'original': original_df} 
     print(f"Starting processing for {len(dataframes_to_process)} dataframes...")
 
     for name, df_to_merge in dataframes_to_process.items():

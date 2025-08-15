@@ -25,82 +25,82 @@ class TableConfig:
         It bypasses the frozen=True limitation for initial assignment to _config.
         """
         object.__setattr__(self, '_config', {
-            # "base": {
-            #     "even": {
-            #         "cohort data": {
-            #             "original": "logistics-vendor-production.pa_staging.devin_original_cohort_step3",
-            #             "current": "logistics-vendor-production.pa_staging.devin_smart_reco_vendor_cohorts_step_3",
-            #         },
-            #         "recommendation": {
-            #             "original": "logistics-vendor-production.pa_staging.devin_smart_recommendations_v5_step3",
-            #             "current": "logistics-vendor-production.pa_staging.devin_smart_recommendations_v1_step3",
-            #         },
-            #         "recommendation (KPIs)": {
-            #             "original": "logistics-vendor-production.pa_staging.devin_smart_reco_metrics_v4",
-            #             "current": "logistics-vendor-production.pa_staging.devin_smart_reco_metrics_v1",
-            #         }
+            "base": {
+                "even": {
+                    "cohort data": {
+                        "original": "logistics-vendor-production.pa_staging.devin_original_cohort_step3",
+                        "current": "logistics-vendor-production.pa_staging.devin_smart_reco_vendor_cohorts_step_3",
+                    },
+                    "recommendation": {
+                        "original": "logistics-vendor-production.pa_staging.devin_smart_recommendations_v5_step3",
+                        "current": "logistics-vendor-production.pa_staging.devin_smart_recommendations_v1_step3",
+                    },
+                    "recommendation (KPIs)": {
+                        "original": "logistics-vendor-production.pa_staging.devin_smart_reco_metrics_v4",
+                        "current": "logistics-vendor-production.pa_staging.devin_smart_reco_metrics_v1",
+                    }
 
-            #     },
-            #     "uneven": {
-            #         "cohort data": {
-            #             "current": "logistics-vendor-production.pa_staging.devin_smart_reco_vendor_cohorts_step_3_uneven"
-            #         },
-            #         "recommendation": {
-            #             "current": "logistics-vendor-production.pa_staging.devin_smart_recommendations_v1_step3_uneven"
-            #         },
-            #         "recommendation (KPIs)": {
-            #             "current": "logistics-vendor-production.pa_staging.devin_smart_reco_metrics_v1_benchmark_uneven"
-            #         }
-            #     }
-            # },
-            # "key account segment addition": {
-            #     "even": {
-            #         "cohort data": {
-            #             "current": "logistics-vendor-production.pa_staging.devin_smart_reco_vendor_cohorts_step_3_vendor_cohorts_new_key_segment"
-            #         },
-            #         "recommendation": {
-            #             "current": "logistics-vendor-production.pa_staging.devin_smart_recommendations_v4_step3"
-            #         },
-            #         "recommendation (KPIs)": {
-            #             "current": "logistics-vendor-production.pa_staging.devin_smart_reco_metrics_v3"
-            #         }
-            #     },
-            #     "uneven": {
-            #         "cohort data": {
-            #             "current": "logistics-vendor-production.pa_staging.devin_smart_reco_vendor_cohorts_step_3_uneven_v2"
-            #         },
-            #         "recommendation": {
-            #             "current": "logistics-vendor-production.pa_staging.devin_smart_recommendations_v1_step3_uneven_v2"
-            #         },
-            #         "recommendation (KPIs)": {
-            #             "current": "logistics-vendor-production.pa_staging.devin_smart_reco_metrics_v1_benchmark_uneven_v2"
-            #         },
-            #     }
-            # },
-            # "no chain logic": {
-            #             "even": {
-            #                 "cohort data": {
-            #                     "current": "logistics-vendor-production.pa_staging.devin_smart_reco_vendor_cohorts_step_3_chainless"
-            #                 },
-            #                 "recommendation": {
-            #                     "current": "logistics-vendor-production.pa_staging.devin_smart_recommendations_v2_step3"
-            #                 },
-            #                 "recommendation (KPIs)": {
-            #                     "current": "logistics-vendor-production.pa_staging.devin_smart_reco_metrics_v2"
-            #                 }
-            #             },
-            #             "uneven": {
-            #                 "cohort data": {
-            #                     "current": "logistics-vendor-production.pa_staging.devin_smart_reco_vendor_cohorts_step_3_uneven_v1"
-            #                 },
-            #                 "recommendation": {
-            #                     "current": "logistics-vendor-production.pa_staging.devin_smart_recommendations_v1_step3_uneven_v1"
-            #                 },
-            #                 "recommendation (KPIs)": {
-            #                     "current": "logistics-vendor-production.pa_staging.devin_smart_reco_metrics_v1_benchmark_uneven_v1"
-            #                 }
-            #             }
-            # },
+                },
+                "uneven": {
+                    "cohort data": {
+                        "current": "logistics-vendor-production.pa_staging.devin_smart_reco_vendor_cohorts_step_3_uneven"
+                    },
+                    "recommendation": {
+                        "current": "logistics-vendor-production.pa_staging.devin_smart_recommendations_v1_step3_uneven"
+                    },
+                    "recommendation (KPIs)": {
+                        "current": "logistics-vendor-production.pa_staging.devin_smart_reco_metrics_v1_benchmark_uneven"
+                    }
+                }
+            },
+            "key account segment addition": {
+                "even": {
+                    "cohort data": {
+                        "current": "logistics-vendor-production.pa_staging.devin_smart_reco_vendor_cohorts_step_3_vendor_cohorts_new_key_segment"
+                    },
+                    "recommendation": {
+                        "current": "logistics-vendor-production.pa_staging.devin_smart_recommendations_v4_step3"
+                    },
+                    "recommendation (KPIs)": {
+                        "current": "logistics-vendor-production.pa_staging.devin_smart_reco_metrics_v3"
+                    }
+                },
+                "uneven": {
+                    "cohort data": {
+                        "current": "logistics-vendor-production.pa_staging.devin_smart_reco_vendor_cohorts_step_3_uneven_v2"
+                    },
+                    "recommendation": {
+                        "current": "logistics-vendor-production.pa_staging.devin_smart_recommendations_v1_step3_uneven_v2"
+                    },
+                    "recommendation (KPIs)": {
+                        "current": "logistics-vendor-production.pa_staging.devin_smart_reco_metrics_v1_benchmark_uneven_v2"
+                    },
+                }
+            },
+            "no chain logic": {
+                        "even": {
+                            "cohort data": {
+                                "current": "logistics-vendor-production.pa_staging.devin_smart_reco_vendor_cohorts_step_3_chainless"
+                            },
+                            "recommendation": {
+                                "current": "logistics-vendor-production.pa_staging.devin_smart_recommendations_v2_step3"
+                            },
+                            "recommendation (KPIs)": {
+                                "current": "logistics-vendor-production.pa_staging.devin_smart_reco_metrics_v2"
+                            }
+                        },
+                        "uneven": {
+                            "cohort data": {
+                                "current": "logistics-vendor-production.pa_staging.devin_smart_reco_vendor_cohorts_step_3_uneven_v1"
+                            },
+                            "recommendation": {
+                                "current": "logistics-vendor-production.pa_staging.devin_smart_recommendations_v1_step3_uneven_v1"
+                            },
+                            "recommendation (KPIs)": {
+                                "current": "logistics-vendor-production.pa_staging.devin_smart_reco_metrics_v1_benchmark_uneven_v1"
+                            }
+                        }
+            },
             "ys_tr": {
                         "original": {
                             "cohort data": {
