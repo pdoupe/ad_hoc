@@ -16,6 +16,7 @@ WITH
     t1.global_entity_id,
     t1.vendor_id,
     campaign_id,
+    ROUND(SUM(gmv_eur_direct), 1) AS gmv_eur_direct,
     ROUND(SUM(initial_budget),0) as booked_budget,
     SUM(cpc_clicks) as cpc_clicks,
     SUM(cpc_orders) as cpc_orders,

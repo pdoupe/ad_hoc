@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "bigframes>=2.15.0",
+    "bigquery-magics>=0.10.2",
     "google-cloud-bigquery>=3.35.1",
     "matplotlib>=3.10.5",
     "numpy>=2.3.2",
