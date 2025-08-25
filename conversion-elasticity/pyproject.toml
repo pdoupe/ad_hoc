@@ -1,0 +1,20 @@
+[project]
+name = "conversion-elasticity"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "bigquery-magics>=0.10.2",
+    "ipython>=9.4.0",
+    "jupyter>=1.1.1",
+    "matplotlib>=3.10.5",
+    "notebook>=7.4.5",
+    "numpy>=2.3.2",
+    "pandas>=2.3.1",
+    "pandas-gbq>=0.29.2",
+    "pyfixest>=0.9.8",
+    "scipy>=1.16.1",
+    "seaborn>=0.13.2",
+    "statsmodels>=0.14.5",
+]
