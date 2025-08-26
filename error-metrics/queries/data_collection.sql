@@ -9,10 +9,12 @@ DECLARE reco_source STRING DEFAULT '{RECO_SOURCE}'; -- Set to 'CEB' for CEB reco
 DECLARE booking_source_param STRING DEFAULT '{BOOKING_SOURCE}'; -- Set to 'agent' or 'vendor'.
 
 WITH
- il_cpc_cte AS (
+ outcomes AS (
   SELECT
     date_month, 
     management_entity,
+    accounts_segment,
+    long_tail_sub_category,
     t1.global_entity_id,
     t1.vendor_id,
     campaign_id,
@@ -34,6 +36,28 @@ WITH
     GROUP BY ALL 
  ),
 
+history AS (
+  SELECT
+    global_entity_id,
+    vendor_id,
+    SUM(value.order.gmv_eur) AS L3m_total_gmv_eur,
+    SUM(value.order.gmv_eur) / COUNT(DISTINCT order_id) AS L3m_average_order_value_eur
+  FROM `fulfillment-dwh-production.curated_data_shared_coredata_business.orders` 
+  WHERE partition_date_local >= '2025-03-01' AND partition_date_local < '2025-06-01'
+    AND vertical_parent = 'Food'  
+    GROUP BY ALL 
+ ),
+
+il_cpc AS (
+  SELECT
+    o.*,
+    COALESCE(h.L3m_total_gmv_eur, 0) AS L3m_total_gmv_eur,
+    COALESCE(h.L3m_average_order_value_eur, 0) AS L3m_average_order_value_eur
+  FROM outcomes o
+  LEFT JOIN history h
+  USING (global_entity_id, vendor_id)
+),
+ 
 recos_ml as (
   SELECT * FROM 
 ((SELECT *, "PEYA" as MARKET FROM `dhh-ncr-live.performance_estimation.LATAM_budget_recos` r
@@ -43,10 +67,8 @@ UNION ALL
   IF (global_entity_id LIKE "TB_%", "TALABAT", "HS") as MARKET 
   FROM `dhh-ncr-live.performance_estimation.MENA_budget_recos` r
 WHERE r.reco_date = '2025-05-07'))
-LEFT JOIN 
-il_cpc_cte
-USING (global_entity_id, vendor_id)
-WHERE il_cpc_cte.cpc_clicks is not Null
+LEFT JOIN  il_cpc USING (global_entity_id, vendor_id)
+WHERE il_cpc.cpc_clicks is not Null
 ),
 
 gaid_currency as
@@ -87,16 +109,18 @@ recos_ceb as (
 
 recos_ceb_t as (
   SELECT * FROM recos_ceb
-  LEFT JOIN 
-  il_cpc_cte
-  USING (global_entity_id, vendor_id)
-  WHERE il_cpc_cte.cpc_clicks is not Null
+  LEFT JOIN il_cpc USING (global_entity_id, vendor_id)
+  WHERE il_cpc.cpc_clicks is not Null
 ),
 
 final_recos AS (
   SELECT
     global_entity_id,
     vendor_id,
+    accounts_segment,
+    long_tail_sub_category,
+    L3m_average_order_value_eur,
+    L3m_total_gmv_eur,
     min_budget_rec_eur,
     max_budget_rec_eur,
     min_budget_clicks,
@@ -122,6 +146,10 @@ final_recos AS (
   SELECT
     global_entity_id,
     vendor_id,
+    accounts_segment,
+    long_tail_sub_category,
+    L3m_average_order_value_eur,
+    L3m_total_gmv_eur,
     min_budget_rec_eur,
     max_budget_rec_eur,
     min_budget_clicks,
@@ -149,6 +177,10 @@ kb AS (
     vendor_id,
     date_month,
     management_entity,
+    accounts_segment,
+    long_tail_sub_category,
+    L3m_average_order_value_eur,
+    L3m_total_gmv_eur,
     campaign_id,
     booked_budget,
     cpc_clicks,
@@ -175,6 +207,10 @@ kb AS (
     vendor_id,
     date_month,
     management_entity,
+    accounts_segment,
+    long_tail_sub_category,
+    L3m_average_order_value_eur,
+    L3m_total_gmv_eur,
     campaign_id,
     booked_budget,
     cpc_clicks,
