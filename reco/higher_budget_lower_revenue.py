@@ -32,10 +32,10 @@ def main():
     tmp['lower_budget_1'] = tmp.reco_budget_lc_1 < tmp.reco_budget_lc_2
     tmp['lower_roas_1'] = tmp.e_roas_1 < tmp.e_roas_2
 
-    print(f"""The share of vendors (with recommendation > estimated gmv) that
-          have a lower budget for reco 1: {tmp.lower_budget_1.mean():.2f}""")
-    print(f"""The share of vendors that have a lower NR for reco 1:
-          {tmp.lower_nr_1.mean():.2f}""")
+    print(f"""The share of vendors that have a lower budget for reco 1:
+          {tmp.lower_budget_1.mean():.2f}""")
+    print(f"""The share of vendors that have a lower NR (but positive NR) for
+          reco 1: {tmp.lower_nr_1.mean():.2f}""")
     print(f"""The share of vendors that have a lower GMV for reco 1:
           {tmp.lower_gmv_1.mean():.2f}""")
     print(f"""The share of vendors that have a lower ROAS for reco 1:
