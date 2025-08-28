@@ -234,17 +234,18 @@ base AS (
 SELECT 
     management_entity,
     reco_source,
-    SAFE_DIVIDE(AVG(ABS(cpc_clicks - adj_e_clicks)),  AVG(cpc_clicks)) AS SMAE_clicks,
-    SAFE_DIVIDE(AVG(ABS(cpc_orders - adj_e_orders)), AVG(cpc_orders)) AS SMAE_orders,
-    SAFE_DIVIDE(AVG(ABS(roas - adj_e_roas)), AVG(roas)) AS SMAE_roas,
-    AVG(SAFE_DIVIDE(ABS(cpc_clicks - adj_e_clicks), cpc_clicks)) AS MAPE_clicks,
-    AVG(SAFE_DIVIDE(ABS(cpc_orders - adj_e_orders), cpc_orders)) AS MAPE_orders,
-    AVG(SAFE_DIVIDE(ABS(roas - adj_e_roas), roas)) AS MAPE_roas,
+    100*SAFE_DIVIDE(AVG(ABS(cpc_clicks - adj_e_clicks)),  AVG(cpc_clicks)) AS SMAE_clicks,
+    100*SAFE_DIVIDE(AVG(ABS(cpc_orders - adj_e_orders)), AVG(cpc_orders)) AS SMAE_orders,
+    100*SAFE_DIVIDE(AVG(ABS(roas - adj_e_roas)), AVG(roas)) AS SMAE_roas,
+    100*AVG(SAFE_DIVIDE(ABS(cpc_clicks - adj_e_clicks), cpc_clicks)) AS MAPE_clicks,
+    100*AVG(SAFE_DIVIDE(ABS(cpc_orders - adj_e_orders), cpc_orders)) AS MAPE_orders,
+    100*AVG(SAFE_DIVIDE(ABS(roas - adj_e_roas), roas)) AS MAPE_roas,
     AVG(ABS(cpc_clicks - adj_e_clicks)) AS MAE_clicks,
     AVG(ABS(cpc_orders - adj_e_orders))AS MAE_orders,
     AVG(ABS(roas - adj_e_roas)) AS MAE_roas
 FROM base
-WHERE cpc_clicks > 50
+WHERE adj_e_clicks > 100
+AND reco_source = 'CEB'
 GROUP BY ALL
 ORDER BY 2, 1
 

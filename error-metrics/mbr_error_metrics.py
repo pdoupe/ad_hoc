@@ -27,5 +27,13 @@ if __name__=="__main__":
                              )
     print("Metrics calculated!\n")
     print(df)
-
+    
+    pandas_gbq.to_gbq(
+        df,
+        f"patrick_doupe.smae_{OUTCOMES_MONTH}",
+        project_id="dhh-ncr-stg",
+        if_exists='replace' # or 'append'
+    )
+    print(f""" Dataset uploaded to big query:
+    dhh-ncr-stg.patrick_doupe.smae_{OUTCOMES_MONTH}""")
 #EOF
