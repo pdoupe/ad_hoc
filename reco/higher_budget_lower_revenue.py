@@ -15,7 +15,6 @@ def main():
     query = """
         SELECT * 
         FROM dhh-ncr-stg.performance_estimation.PEYA_cpc_budget_recos
-        WHERE model_name = 'cpc_budget_recos_v1.0_new'
     """
 
     df = pandas_gbq.read_gbq(query)
@@ -23,7 +22,7 @@ def main():
 
     cols = ['global_entity_id', 'vendor_id', 'e_cpc_gmv', 'reco_budget_lc',
             'e_roas', 'net_revenue', 'reco_date']
-    df_1 = df.loc[df.reco_num == 2]
+    df_1 = df.loc[df.reco_num == 1]
     df_2 = df.loc[df.reco_num == 3]
     tmp = pd.merge(df_1[cols], df_2[cols], how='inner', on=['global_entity_id', 'vendor_id', 'reco_date'], suffixes=['_1', '_2'])
     
